@@ -59,6 +59,6 @@ test('network and rate-limit errors never start an automatic registration', asyn
     signInWithPassword: async () => ({ error: rateLimit }),
     signUp: async () => { signupCalled = true; },
   };
-  await assert.rejects(signInOrCreate(auth, 'user@example.com', 'password123'), /Rate limit exceeded/);
+  await assert.rejects(signInOrCreate(auth, 'user@example.com', 'password123'), error => error?.message === 'Rate limit exceeded');
   assert.equal(signupCalled, false);
 });
