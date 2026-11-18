@@ -32,7 +32,7 @@ FraudShield AI is an **academic full-stack fraud-risk exploration project**. The
 | **Analytics** | Spending categories, trend charts, risk composition | Synthetic transactions |
 | **Detection rules** | Adjust amount, velocity, score thresholds and signal toggles | Browser or Supabase |
 | **Simulation** | Generate normal, international, rapid-transfer and high-value examples | Generated synthetic data |
-| **Authentication** | Email/password registration, sign-in, sign-out | Supabase Auth |
+| **Authentication** | Single email/password form; sign-in or instant demo account creation when confirmation is disabled | Supabase Auth |
 | **Risk API (optional)** | Validate and score demo transactions over HTTP | Express + shared rule engine |
 
 ## Technology stack
@@ -44,7 +44,7 @@ FraudShield AI is an **academic full-stack fraud-risk exploration project**. The
 | Data & identity | Supabase Auth + PostgreSQL, Row Level Security |
 | Shared logic | Pure JavaScript scoring library used by the React app and API |
 | Testing | Node.js built-in test runner, GitHub Actions |
-| Deployment | Render blueprint **prepared**, not yet deployed |
+| Deployment | Render live frontend and Express API |
 
 ## Architecture
 
@@ -111,7 +111,7 @@ npm --prefix frontend install
 npm run dev
 ```
 
-Open **http://localhost:5173**. Use the login screen to create a Supabase account. You may need to confirm your email depending on the project's Auth settings.
+Open **http://localhost:5173**. Enter your email and password on the single sign-in screen. Existing accounts sign in; new demo accounts are automatically created. **For instant registration without verification emails, disable Supabase Authentication → Sign In / Providers → Email → Confirm email in the project dashboard.** The React client cannot override that server setting.
 
 **Optional API** (new terminal):
 
@@ -137,7 +137,7 @@ VITE_SUPABASE_URL=https://lgpnfcocmfnhnsgeqbbu.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<your-browser-safe-publishable-key>
 ```
 
-Never commit the **secret** or `service_role` key. Configure **Authentication → URL Configuration** with `http://localhost:5173` during development, and add your deployed domain later. See [Database & Auth](docs/DATABASE.md).
+Never commit the **secret** or `service_role` key. For this demo, set **Authentication → Sign In / Providers → Email → Confirm email** to OFF if you want password-only registration. This means users can register using email addresses they do not control: avoid this configuration for real customer/financial data. In **Authentication → URL Configuration**, use the deployed site `https://fraudshield-web-cyi6.onrender.com` and keep `http://localhost:5173` as a development redirect if needed. See [Database & Auth](docs/DATABASE.md).
 
 ## How scoring works
 
@@ -176,7 +176,7 @@ See request/response examples in [API Reference](docs/API_REFERENCE.md).
 - **Phase 1:** Responsive browser demo, dashboard, charts, alerts — complete.
 - **Phase 2:** Supabase project, Auth, database tables, per-user RLS, persistence — configured; user flows still require browser acceptance testing.
 - **Phase 2.5:** Modular monorepo, optional Express scoring API, test suite, documentation — included.
-- **Phase 3:** Render deployment and public URL — **not done yet**. A suggested blueprint is provided in `render.yaml`.
+- **Phase 3:** Render frontend `https://fraudshield-web-cyi6.onrender.com` and API `https://fraudshield-api-hlhm.onrender.com` — deployed. A blueprint is in `render.yaml`.
 
 Review the [roadmap](docs/ROADMAP.md), [security notes](docs/SECURITY.md), [deployment guide](docs/DEPLOYMENT.md), and [contributing guide](CONTRIBUTING.md).
 
