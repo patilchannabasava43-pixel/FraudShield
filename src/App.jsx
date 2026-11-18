@@ -16,6 +16,9 @@ import {
 } from 'recharts';
 import { initialTransactions, demoScenarios, simulateTransaction } from './data/transactions';
 import { analyzeTransaction, DEFAULT_RULES, formatMoney, compactMoney, formatDateTime, formatDate } from './lib/risk';
+import { supabase, supabaseConfigured } from './lib/supabase';
+import { loadWorkspace, addTransaction, updateReview, saveRules, resetWorkspace } from './lib/workspace';
+import AuthScreen from './AuthScreen';
 
 const STORAGE = 'fraudshield_phase1_demo_v1';
 const pages = [
@@ -46,7 +49,7 @@ function PageHeading({eyebrow,title,subtitle,actions}) {
 function SectionTitle({title,caption,action}) {
   return <div className="section-heading"><div><h3>{title}</h3>{caption&&<p>{caption}</p>}</div>{action}</div>;
 }
-function Sidebar({page,setPage,alertCount,mobileOpen,setMobileOpen}) {
+function Sidebar({page,setPage,alertCount,mobileOpen,setMobileOpen,userEmail}) {
   return <>
     {mobileOpen&&<div className="mobile-scrim" onClick={()=>setMobileOpen(false)} />}
     <aside className={`sidebar ${mobileOpen?'mobile-open':''}`}>
@@ -64,7 +67,7 @@ function Sidebar({page,setPage,alertCount,mobileOpen,setMobileOpen}) {
       <nav className="sidebar-nav"><button className={`nav-item ${page==='settings'?'active':''}`} onClick={()=>{setPage('settings');setMobileOpen(false)}}><Settings2 size={19}/><span>Settings</span></button></nav>
       <div className="sidebar-spacer" />
       <div className="assistant-card"><div className="assistant-symbol"><Sparkles size={19}/></div><strong>Meet your fraud copilot</strong><p>Explore patterns, detect anomalies, and understand risk.</p><span>Demo intelligence <ArrowUpRight size={14}/></span></div>
-      <div className="sidebar-user"><div className="avatar">DA</div><div><strong>Demo Analyst</strong><small>Workspace admin</small></div><span className="online-dot"/></div>
+      <div className="sidebar-user"><div className="avatar">DA</div><div><strong>{userEmail ? userEmail.split('@')[0] : 'Demo Analyst'}</strong><small>{userEmail || 'Local demo'}</small></div><span className="online-dot"/></div>
     </aside>
   </>;
 }
@@ -130,10 +133,10 @@ function Switch({checked,onChange,label,help}) {
 }
 function RulesPage({rules,setRules,rows,onResetRules}) {
   const update=(key,value)=>setRules(prev=>({...prev,[key]:value}));
-  return <><PageHeading eyebrow="FRAUD INTELLIGENCE" title="Detection rules" subtitle="Customize how the demonstration evaluates transaction risk." actions={<button className="button subtle" onClick={onResetRules}><RotateCcw size={17}/> Restore defaults</button>}/><div className="rules-layout"><div className="panel rules-card"><SectionTitle title="Risk scoring controls" caption="Updates recalculate all demo transaction scores instantly"/><div className="slider-block"><div className="slider-label"><strong>High-value transaction threshold</strong><span>{formatMoney(rules.highAmount)}</span></div><p>Amounts above this threshold receive an elevated risk score.</p><input type="range" min="5000" max="100000" step="5000" value={rules.highAmount} onChange={e=>update('highAmount',Number(e.target.value))}/><div className="range-ends"><span>₹5,000</span><span>₹1,00,000</span></div></div><div className="slider-block"><div className="slider-label"><strong>Rapid activity threshold</strong><span>{rules.velocityLimit} transactions</span></div><p>Flag bursts of activity within a short observation window.</p><input type="range" min="2" max="10" step="1" value={rules.velocityLimit} onChange={e=>update('velocityLimit',Number(e.target.value))}/><div className="range-ends"><span>2 transactions</span><span>10 transactions</span></div></div><div className="slider-block"><div className="slider-label"><strong>High-risk alert score</strong><span>{rules.highRiskThreshold} / 100</span></div><p>Transactions at or above this score are classified as high risk.</p><input type="range" min="55" max="90" step="5" value={rules.highRiskThreshold} onChange={e=>update('highRiskThreshold',Number(e.target.value))}/><div className="range-ends"><span>55 (sensitive)</span><span>90 (strict)</span></div></div></div><div className="panel rules-card"><SectionTitle title="Monitoring signals" caption="Turn individual risk indicators on or off"/><Switch label="International transactions" help="Flag payment activity outside the expected country." checked={rules.monitorInternational} onChange={v=>update('monitorInternational',v)}/><Switch label="New or unrecognized devices" help="Increase risk for unfamiliar devices." checked={rules.monitorNewDevices} onChange={v=>update('monitorNewDevices',v)}/><Switch label="Unusual transaction hours" help="Add a risk signal for unexpected timing." checked={rules.monitorUnusualHours} onChange={v=>update('monitorUnusualHours',v)}/><div className="rules-footnote"><Info size={17}/> Settings are saved locally in your browser during Phase 1. No real bank data is accessed.</div></div></div></>;
+  return <><PageHeading eyebrow="FRAUD INTELLIGENCE" title="Detection rules" subtitle="Customize how the demonstration evaluates transaction risk." actions={<button className="button subtle" onClick={onResetRules}><RotateCcw size={17}/> Restore defaults</button>}/><div className="rules-layout"><div className="panel rules-card"><SectionTitle title="Risk scoring controls" caption="Updates recalculate all demo transaction scores instantly"/><div className="slider-block"><div className="slider-label"><strong>High-value transaction threshold</strong><span>{formatMoney(rules.highAmount)}</span></div><p>Amounts above this threshold receive an elevated risk score.</p><input type="range" min="5000" max="100000" step="5000" value={rules.highAmount} onChange={e=>update('highAmount',Number(e.target.value))}/><div className="range-ends"><span>₹5,000</span><span>₹1,00,000</span></div></div><div className="slider-block"><div className="slider-label"><strong>Rapid activity threshold</strong><span>{rules.velocityLimit} transactions</span></div><p>Flag bursts of activity within a short observation window.</p><input type="range" min="2" max="10" step="1" value={rules.velocityLimit} onChange={e=>update('velocityLimit',Number(e.target.value))}/><div className="range-ends"><span>2 transactions</span><span>10 transactions</span></div></div><div className="slider-block"><div className="slider-label"><strong>High-risk alert score</strong><span>{rules.highRiskThreshold} / 100</span></div><p>Transactions at or above this score are classified as high risk.</p><input type="range" min="55" max="90" step="5" value={rules.highRiskThreshold} onChange={e=>update('highRiskThreshold',Number(e.target.value))}/><div className="range-ends"><span>55 (sensitive)</span><span>90 (strict)</span></div></div></div><div className="panel rules-card"><SectionTitle title="Monitoring signals" caption="Turn individual risk indicators on or off"/><Switch label="International transactions" help="Flag payment activity outside the expected country." checked={rules.monitorInternational} onChange={v=>update('monitorInternational',v)}/><Switch label="New or unrecognized devices" help="Increase risk for unfamiliar devices." checked={rules.monitorNewDevices} onChange={v=>update('monitorNewDevices',v)}/><Switch label="Unusual transaction hours" help="Add a risk signal for unexpected timing." checked={rules.monitorUnusualHours} onChange={v=>update('monitorUnusualHours',v)}/><div className="rules-footnote"><Info size={17}/> Detection settings are saved to your active workspace. No real bank data is accessed.</div></div></div></>;
 }
-function SettingsPage({rows,onClear}) {
-  return <><PageHeading eyebrow="YOUR WORKSPACE" title="Settings & project" subtitle="Understand the environment, data source, and roadmap for this prototype."/><div className="settings-grid"><div className="panel settings-panel"><div className="settings-header-icon"><Database size={23}/></div><h3>Data source</h3><p>FraudShield currently runs entirely in your browser using generated sample transactions. Changes persist through local storage on this device.</p><div className="setting-fact"><span>Storage mode</span><strong><span className="green-dot"/> Local demo</strong></div><div className="setting-fact"><span>Stored transactions</span><strong>{rows.length}</strong></div><div className="setting-fact"><span>Real bank connectivity</span><strong>Disabled</strong></div><button className="button subtle full-width" onClick={onClear}><RotateCcw size={17}/> Reset demo data</button></div><div className="panel settings-panel"><div className="settings-header-icon lavender"><Layers3 size={23}/></div><h3>Project roadmap</h3><p>This architecture keeps the frontend ready for later Supabase and deployment integrations.</p><div className="roadmap-item"><span className="roadmap-bullet finished"><Check size={14}/></span><div><strong>Phase 1 · Website prototype</strong><small>Interactive dashboard and risk simulation</small></div><span className="roadmap-status done">Current</span></div><div className="roadmap-item"><span className="roadmap-bullet next">2</span><div><strong>Phase 2 · Supabase</strong><small>Authentication, database, transaction records</small></div><span className="roadmap-status">Planned</span></div><div className="roadmap-item"><span className="roadmap-bullet next">3</span><div><strong>Phase 3 · Render</strong><small>Hosted production deployment and API</small></div><span className="roadmap-status">Planned</span></div></div></div><div className="panel security-note"><LockKeyhole size={20}/><div><strong>Important prototype limitation</strong><p>Risk scoring in Phase 1 is an explainable rule-based simulation, not a trained AI model. Never use it to approve, block, or judge real financial transactions. Real ML training, security controls and validation should be implemented in later phases.</p></div></div></>;
+function SettingsPage({rows,onClear,connected,userEmail}) {
+  return <><PageHeading eyebrow="YOUR WORKSPACE" title="Settings & project" subtitle="Understand the environment, data source, and roadmap for this prototype."/><div className="settings-grid"><div className="panel settings-panel"><div className="settings-header-icon"><Database size={23}/></div><h3>Data source</h3><p>{connected ? 'Your synthetic transactions and detection rules are saved in your personal Supabase workspace, protected by user-based database access policies.' : 'This local demo runs in your browser with generated sample transactions; changes are saved only on this device.'}</p><div className="setting-fact"><span>Storage mode</span><strong><span className="green-dot"/> {connected ? 'Supabase database' : 'Local demo'}</strong></div><div className="setting-fact"><span>Stored transactions</span><strong>{rows.length}</strong></div><div className="setting-fact"><span>Real bank connectivity</span><strong>Disabled</strong></div><button className="button subtle full-width" onClick={onClear}><RotateCcw size={17}/> Reset demo data</button></div><div className="panel settings-panel"><div className="settings-header-icon lavender"><Layers3 size={23}/></div><h3>Project roadmap</h3><p>The frontend supports secure Supabase workspaces. Render deployment remains a future phase.</p><div className="roadmap-item"><span className="roadmap-bullet finished"><Check size={14}/></span><div><strong>Phase 1 · Website prototype</strong><small>Interactive dashboard and risk simulation</small></div><span className="roadmap-status done">Complete</span></div><div className="roadmap-item"><span className="roadmap-bullet next">2</span><div><strong>Phase 2 · Supabase</strong><small>Authentication and private transaction records</small></div><span className="roadmap-status">{connected ? 'Connected' : 'Pending setup'}</span></div><div className="roadmap-item"><span className="roadmap-bullet next">3</span><div><strong>Phase 3 · Render</strong><small>Hosted production deployment and API</small></div><span className="roadmap-status">Planned</span></div></div></div><div className="panel security-note"><LockKeyhole size={20}/><div><strong>Important prototype limitation</strong><p>Risk scoring in Phase 1 is an explainable rule-based simulation, not a trained AI model. Never use it to approve, block, or judge real financial transactions. Real ML training, security controls and validation should be implemented in later phases.</p></div></div></>;
 }
 function Drawer({transaction,onClose,onReview}) {
   if(!transaction)return null;
@@ -151,8 +154,13 @@ function Toast({toast,onDismiss}) {
 }
 export default function App() {
   const [saved]=useState(getStored);
-  const [transactions,setTransactions]=useState(()=>saved?.transactions||initialTransactions());
-  const [rules,setRules]=useState(()=>({...DEFAULT_RULES,...(saved?.rules||{})}));
+  const [transactions,setTransactions]=useState(()=>supabaseConfigured ? [] : (saved?.transactions||initialTransactions()));
+  const [rules,setRules]=useState(()=>({...DEFAULT_RULES,...(supabaseConfigured ? {} : (saved?.rules||{}))}));
+  const [user,setUser]=useState(null);
+  const [authBusy,setAuthBusy]=useState(supabaseConfigured);
+  const [workspaceReady,setWorkspaceReady]=useState(!supabaseConfigured);
+  const [workspaceError,setWorkspaceError]=useState('');
+  const [refreshKey,setRefreshKey]=useState(0);
   const [page,setPage]=useState('overview');
   const [query,setQuery]=useState('');
   const [filter,setFilter]=useState('all');
@@ -160,24 +168,79 @@ export default function App() {
   const [simOpen,setSimOpen]=useState(false);
   const [mobileOpen,setMobileOpen]=useState(false);
   const [toast,setToast]=useState(null);
-  useEffect(()=>{localStorage.setItem(STORAGE,JSON.stringify({transactions,rules}));},[transactions,rules]);
+  // Keep standalone mode unchanged when no Supabase project is configured.
+  useEffect(()=>{if(!supabaseConfigured)localStorage.setItem(STORAGE,JSON.stringify({transactions,rules}));},[transactions,rules]);
+  useEffect(()=>{
+    if (!supabase) return;
+    let alive=true;
+    supabase.auth.getSession().then(({data,error})=>{
+      if (!alive) return;
+      if (error) setWorkspaceError(error.message);
+      setUser(data?.session?.user || null);setAuthBusy(false);
+    }).catch(error=>{if(alive){setWorkspaceError(error.message);setAuthBusy(false)}});
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
+      if(alive){setUser(session?.user || null);setAuthBusy(false)}
+    });
+    return ()=>{alive=false;subscription.unsubscribe()};
+  },[]);
+  useEffect(()=>{
+    if(!supabaseConfigured || !user?.id){setWorkspaceReady(!supabaseConfigured);return;}
+    let alive=true;
+    setWorkspaceReady(false);setWorkspaceError('');
+    loadWorkspace(user.id).then(data=>{
+      if(alive){setTransactions(data.transactions);setRules(data.rules);setWorkspaceReady(true)}
+    }).catch(error=>{if(alive){setWorkspaceError(error.message);setWorkspaceReady(false)}});
+    return ()=>{alive=false};
+  },[user?.id,refreshKey]);
+  useEffect(()=>{
+    if(!supabaseConfigured || !user?.id || !workspaceReady) return;
+    const timer=setTimeout(()=>{saveRules(user.id,rules).catch(error=>{
+      setToast({kind:'warning',title:'Could not save rules',detail:error.message});
+    })},700);
+    return ()=>clearTimeout(timer);
+  },[rules,user?.id,workspaceReady]);
   useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(null),4800);return()=>clearTimeout(timer);},[toast]);
   useEffect(()=>{const handler=e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();setPage('transactions');document.querySelector('.top-search input')?.focus()}if(e.key==='Escape'){setSelectedId(null);setSimOpen(false);setMobileOpen(false)}};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler)},[]);
   const rows=useMemo(()=>transactions.map(t=>({...t,...analyzeTransaction(t,rules)})).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)),[transactions,rules]);
   const selected=rows.find(t=>t.id===selectedId);
   const stats=useMemo(()=>({total:rows.length,volume:rows.reduce((s,t)=>s+t.amount,0),high:rows.filter(t=>t.level==='high').length,medium:rows.filter(t=>t.level==='medium').length,low:rows.filter(t=>t.level==='low').length,flaggedValue:rows.filter(t=>t.level!=='low').reduce((s,t)=>s+t.amount,0)}),[rows]);
   const alertCount=rows.filter(t=>t.level!=='low'&&!t.reviewed).length;
-  const review=(id,result)=>{setTransactions(prev=>prev.map(t=>t.id===id?{...t,reviewed:result}:t));setSelectedId(null);setToast({kind:'success',title:result?'Transaction reviewed':'Review removed',detail:result==='genuine'?'Marked as genuine in this demo.':result==='fraud'?'Marked as confirmed fraud in this demo.':'Transaction returned to the review queue.'});};
-  const run=(scenario)=>{const tx=simulateTransaction(scenario);setTransactions(prev=>[tx,...prev]);setSelectedId(tx.id);const risk=analyzeTransaction(tx,rules);setToast({kind:risk.level==='low'?'success':'warning',title:'Transaction analyzed',detail:`${formatMoney(tx.amount)} · Risk score ${risk.score}/100 · ${riskMeta[risk.level].label}`});};
+  const review=async(id,result)=>{
+    try{
+      if(supabaseConfigured)await updateReview(user.id,id,result);
+      setTransactions(prev=>prev.map(t=>t.id===id?{...t,reviewed:result}:t));setSelectedId(null);
+      setToast({kind:'success',title:result?'Transaction reviewed':'Review removed',detail:'Your review has been saved.'});
+    }catch(error){setToast({kind:'warning',title:'Could not save review',detail:error.message})}
+  };
+  const run=async(scenario)=>{
+    try{
+      let tx=simulateTransaction(scenario);
+      if(supabaseConfigured)tx=await addTransaction(user.id,tx);
+      setTransactions(prev=>[tx,...prev]);setSelectedId(tx.id);
+      const risk=analyzeTransaction(tx,rules);
+      setToast({kind:risk.level==='low'?'success':'warning',title:'Transaction analyzed',detail:`${formatMoney(tx.amount)} · Risk score ${risk.score}/100 · ${riskMeta[risk.level].label}`});
+    }catch(error){setToast({kind:'warning',title:'Could not save transaction',detail:error.message})}
+  };
   const exportCsv=()=>{const header=['ID','Merchant','Category','Amount INR','Location','Date','Risk score','Risk level','Review'];const quote=(s)=>'"'+String(s).replaceAll('"','""')+'"';const csv=[header,...rows.map(t=>[t.id,t.merchant,t.category,t.amount,t.location,t.timestamp,t.score,t.level,t.reviewed||'unreviewed'])].map(row=>row.map(quote).join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='fraudshield-demo-transactions.csv';document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(link.href);setToast({kind:'success',title:'Export downloaded',detail:`Exported ${rows.length} synthetic records as CSV.`})};
-  const reset=()=>{setTransactions(initialTransactions());setRules(DEFAULT_RULES);setSelectedId(null);setToast({kind:'success',title:'Demo restored',detail:'Sample transactions and detection rules have been reset.'})};
-  return <div className="app-shell"><Sidebar page={page} setPage={setPage} alertCount={alertCount} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen}/><div className="main-column"><Header page={page} setPage={setPage} alertCount={alertCount} query={query} setQuery={setQuery} setMobileOpen={setMobileOpen}/><main className="content">
+  const reset=async()=>{
+    try{
+      const data=supabaseConfigured ? await resetWorkspace(user.id) : initialTransactions();
+      setTransactions(data);setRules(DEFAULT_RULES);setSelectedId(null);
+      setToast({kind:'success',title:'Demo restored',detail:'Synthetic transactions and detection rules have been reset.'});
+    }catch(error){setToast({kind:'warning',title:'Could not reset workspace',detail:error.message})}
+  };
+  if(supabaseConfigured && (authBusy || (user && !workspaceReady && !workspaceError))){
+    return <div className="auth-page"><div className="auth-card"><div className="auth-logo"><ShieldCheck size={26}/></div><h1>Loading secure workspace...</h1><p>Connecting to your private demo data.</p></div></div>;
+  }
+  if(supabaseConfigured && !user) return <AuthScreen/>;
+  if(supabaseConfigured && workspaceError) return <div className="auth-page"><div className="auth-card"><h1>Workspace unavailable</h1><p>{workspaceError}</p><button className="button primary auth-submit" onClick={()=>setRefreshKey(key=>key+1)}>Retry connection</button><button className="button subtle auth-submit" onClick={()=>supabase.auth.signOut()}>Sign out</button></div></div>;
+  return <div className="app-shell"><Sidebar page={page} setPage={setPage} alertCount={alertCount} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} userEmail={user?.email}/><div className="main-column"><Header page={page} setPage={setPage} alertCount={alertCount} query={query} setQuery={setQuery} setMobileOpen={setMobileOpen}/><main className="content">{supabaseConfigured && user && <div className="session-strip"><span>Supabase connected · {user.email}</span><button onClick={()=>supabase.auth.signOut()}>Sign out</button></div>}
     {page==='overview'&&<Overview rows={rows} stats={stats} setPage={setPage} onSelect={t=>setSelectedId(t.id)} onSimulate={()=>setSimOpen(true)}/>}
     {page==='transactions'&&<TransactionsPage rows={rows} query={query} setQuery={setQuery} onSelect={t=>setSelectedId(t.id)} filter={filter} setFilter={setFilter} onExport={exportCsv} onSimulate={()=>setSimOpen(true)}/>}
     {page==='alerts'&&<AlertsPage rows={rows} onSelect={t=>setSelectedId(t.id)} onReview={review}/>}
     {page==='analytics'&&<AnalyticsPage rows={rows} stats={stats}/>}
     {page==='rules'&&<RulesPage rules={rules} setRules={setRules} rows={rows} onResetRules={()=>setRules(DEFAULT_RULES)}/>}
-    {page==='settings'&&<SettingsPage rows={rows} onClear={reset}/>}
-    <footer className="app-footer"><span>© {new Date().getFullYear()} FraudShield AI <i/> Phase 1 prototype</span><span><ShieldCheck size={14}/> Synthetic transactions · No real financial data</span></footer>
+    {page==='settings'&&<SettingsPage rows={rows} onClear={reset} connected={supabaseConfigured} userEmail={user?.email}/>}
+    <footer className="app-footer"><span>© {new Date().getFullYear()} FraudShield AI <i/> Synthetic fraud detection prototype</span><span><ShieldCheck size={14}/> Synthetic transactions · No real financial data</span></footer>
   </main></div><Drawer transaction={selected} onClose={()=>setSelectedId(null)} onReview={review}/><Simulator open={simOpen} onClose={()=>setSimOpen(false)} onRun={run}/><Toast toast={toast} onDismiss={()=>setToast(null)}/></div>;
 }
