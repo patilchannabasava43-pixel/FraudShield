@@ -1,6 +1,6 @@
 # FraudShield AI — Financial Fraud Monitoring Prototype
 
-React + Vite dashboard with transparent **demo risk scoring**, synthetic transactions, and optional Supabase Auth + per-user persistence. **This is not a trained fraud detection model** and must not make real banking decisions.
+React + Vite dashboard with transparent **demo risk scoring**, synthetic transactions, and Supabase Auth + per-user persistence. **This is not a trained fraud detection model** and must not make real banking decisions.
 
 ## Running the website
 
@@ -13,22 +13,26 @@ npm run dev
 
 Open the local URL shown by Vite, usually `http://localhost:5173`.
 
-## Phase 2: Supabase integration
+## Phase 2: Supabase integration — connected
 
-The website supports two modes:
+The dedicated **FraudShield** Supabase project has been created in Mumbai (`ap-south-1`) and its schema has been applied. The browser code includes its **public** project URL and publishable key, so no environment variables are needed for local development.
 
-- **Local demo** (no `.env` configuration): synthetic records and detection rules stored in `localStorage`, without authentication. The original Phase 1 demo remains available.
-- **Supabase workspace** (`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` both configured): email/password sign-up and login, with private synthetic transaction records, review feedback and detection rules stored in Postgres. Each signed-in user can access only their own data through Row Level Security.
+- **Supabase project:** https://supabase.com/dashboard/project/lgpnfcocmfnhnsgeqbbu
+- **Project API URL:** https://lgpnfcocmfnhnsgeqbbu.supabase.co
+- **Authentication:** email/password via Supabase Auth; user sessions persist in the browser.
+- **Database:** `fraudshield_transactions` and `fraudshield_rules` with owner-only Row Level Security policies.
+- **Storage:** synthetic transactions, review feedback and detection settings persist in Postgres for the signed-in account. Each user can see only their own records.
 
-To connect the website to a **dedicated** Supabase project:
+To run the connected app:
 
-1. Create or select a project in [Supabase](https://supabase.com/dashboard), then wait for `ACTIVE_HEALTHY`.
-2. Apply `supabase/schema.sql` once in the SQL Editor. This creates `fraudshield_transactions` and `fraudshield_rules` and enables owner-based Row Level Security.
-3. Copy `.env.example` to `.env.local` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` from the project's Connect / API Keys page. Use the **publishable** key (`sb_publishable_...`), **never** a secret or service role key. Restart `npm run dev`.
-4. In Supabase Auth settings, enable email/password login; for confirmation links, add `http://localhost:5173` as an allowed redirect URL. Set the production URL when hosting later.
-5. Sign up, confirm your email if required, and sign in. The dashboard seeds a **synthetic dataset for each new user** and saves simulations, reviews and rules under their own account.
+1. `npm install` and `npm run dev`; open `http://localhost:5173`.
+2. Create an account with an email address and password. If Supabase email confirmation is enabled, verify the email before signing in.
+3. If the confirmation link doesn't return to the local app, visit Supabase **Authentication → URL Configuration**, set the Site URL to `http://localhost:5173`, and allow `http://localhost:5173/**` as a redirect URL. Later add your production domain.
+4. Sign in. The dashboard creates **synthetic** transaction records for each new user. Try simulating a transaction, reviewing an alert, and changing a rule; the changes are saved in Supabase.
 
-For a hosted Vite build, set these same two environment variables in the hosting service **at build time**. Do not put private keys or real financial data into source control.
+The `src/lib/supabase.js` file contains **only** the Supabase URL and publishable browser key. It does **not** contain a secret or service-role key. Optional `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` values in `.env.local` can override the defaults for another project (do not commit `.env.local`).
+
+The schema at `supabase/schema.sql` is already applied to the dedicated project; don't run it again unless you are setting up a new database. Supabase's security advisor reported no findings at initial setup.
 
 ### What is stored in Supabase?
 
@@ -48,7 +52,7 @@ Overview dashboard, searchable transactions, fraud alerts, risk analytics, adjus
 src/
   App.jsx                  # Dashboard screens and integration
   AuthScreen.jsx           # Email/password auth UI
-  lib/supabase.js          # Browser client, public env configuration
+  lib/supabase.js          # Browser client, public project configuration
   lib/workspace.js         # Supabase data access
   lib/risk.js              # Transparent demo heuristic
   data/transactions.js     # Synthetic fixture transactions
@@ -58,4 +62,4 @@ supabase/schema.sql        # Per-user tables and RLS policies
 
 ## Next phase: Render deployment
 
-`npm run build` produces `dist/`. Deploy as a static site with build command `npm ci && npm run build` **after generating and committing a package lockfile**, and set the Vite variables at build time. Render deployment has intentionally not been performed in Phase 2.
+`npm run build` produces `dist/`. Deploy as a static site with build command `npm ci && npm run build` **after generating and committing a package lockfile**, and optionally override the Vite variables at build time. The public default project configuration is already included. Render deployment has intentionally not been performed in Phase 2.
