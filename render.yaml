@@ -1,0 +1,31 @@
+# Phase 3 Render blueprint (not yet deployed)
+# Use the repository root for each build so shared/risk.js is accessible.
+services:
+  - type: web
+    name: fraudshield-api
+    runtime: node
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: node backend/src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_ORIGINS
+        sync: false
+  - type: web
+    name: fraudshield-web
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_SUPABASE_URL
+        value: https://lgpnfcocmfnhnsgeqbbu.supabase.co
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: VITE_API_URL
+        sync: false
