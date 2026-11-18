@@ -1,6 +1,10 @@
-# Render deployment — Phase 3 (not deployed)
+# Render deployment — Phase 3 (deployed)
 
-A blueprint is checked in as `render.yaml`, modeled for two separate Render services. No live FraudShield URL is claimed here.
+Live website: https://fraudshield-web-cyi6.onrender.com
+
+Live Express API: https://fraudshield-api-hlhm.onrender.com
+
+A reference blueprint is checked in as `render.yaml`, modeled for two separate Render services. The existing live services were created in Render from the same repository.
 
 ## Services
 
@@ -24,7 +28,9 @@ Never use the Supabase **secret** key in frontend env vars. Publishable keys are
 
 ## Authentication configuration
 
-When the frontend has a real Render URL, update **Supabase → Authentication → URL Configuration** to include the full HTTPS frontend origin in Site URL and allowed redirect URLs. Existing `http://localhost:5173` can remain as a development redirect if appropriate.
+Set **Supabase → Authentication → URL Configuration** Site URL to `https://fraudshield-web-cyi6.onrender.com` and add `https://fraudshield-web-cyi6.onrender.com/**` to allowed redirect URLs. Existing `http://localhost:5173` may remain as a development redirect.
+
+For the academic demo's **one-field-pair login without Gmail confirmation**, open **Supabase → Authentication → Sign In / Providers → Email** and turn OFF **Confirm email**. Save the setting. This is a server-side Auth provider setting, not a React frontend setting; the frontend cannot bypass it. Once OFF, newly created accounts receive a session immediately. **Security caution:** this lets people create accounts with email addresses they do not own. Restore confirmation before using real financial or customer data. Existing unconfirmed accounts might require cleanup in Authentication → Users if they cannot sign in.
 
 ## Smoke tests
 
